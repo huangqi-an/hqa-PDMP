@@ -1,0 +1,29 @@
+# 依赖
+node_modules/
+
+# 构建产物
+dist/
+build/
+coverage/
+
+# 环境变量（保留 .env.example）
+.env
+.env.*
+!.env.example
+
+# 日志
+*.log
+logs/
+
+# Go 编译产物
+*.exe
+*.test
+*.out
+bin/
+
+# 编辑器与系统文件
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp

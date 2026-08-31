@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: hqa-postgres
+    environment:
+      POSTGRES_USER: hqa
+      POSTGRES_PASSWORD: hqa
+      POSTGRES_DB: hqa_pdmp
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:

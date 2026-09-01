@@ -16,6 +16,7 @@ hqa-PDMP 是一个个人数据管理平台。首期 MVP 聚焦两件事：
 | 模块 | 选型 |
 | --- | --- |
 | 前端 | Vue 3 + Vite + TypeScript |
+| 包管理器 | pnpm |
 | 认证服务 auth-service | Node.js + Express + TypeScript + Prisma |
 | 密钥库服务 vault-service | Go + Gin + GORM + golang-migrate |
 | 数据库 | PostgreSQL |
@@ -104,16 +105,15 @@ hqa-PDMP/
 
 `packages/ui` 建议放：通用 Vue 组件（按钮、输入框、弹窗、表格、分页、Toast、确认框）、设计 token 与主题变量、图标封装。
 
-使用方式：根目录 `package.json` 声明 workspaces，`packages/shared` 命名为 `@hqa/shared`，前端通过 workspace 依赖引入。
+使用方式：根目录用 `pnpm-workspace.yaml` 声明 workspaces，`packages/shared` 命名为 `@hqa/shared`，前端通过 workspace 依赖引入。
 
-根目录 `package.json`：
+根目录 `pnpm-workspace.yaml`：
 
-```json
-{
-  "name": "hqa-pdmp",
-  "private": true,
-  "workspaces": ["apps/*", "packages/*"]
-}
+```yaml
+packages:
+  - apps/*
+  - services/*
+  - packages/*
 ```
 
 `packages/shared/package.json`：
@@ -138,7 +138,7 @@ hqa-PDMP/
 }
 ```
 
-pnpm 使用 `workspace:*`，npm 使用 `"*"`。开发期让 `main`/`types` 直接指向 `src/index.ts`，Vite 与 tsx 可直接编译，无需先构建；发布前再用 tsc 或 tsup 构建出 `dist` 目录。
+使用 `workspace:*` 协议引用本地包。开发期让 `main`/`types` 直接指向 `src/index.ts`，Vite 与 tsx 可直接编译，无需先构建；发布前再用 tsc 或 tsup 构建出 `dist` 目录。
 
 建议先不急于抽包，等出现第二处重复时再抽取，避免过度设计；最先值得共享的是统一响应格式与错误码。
 
@@ -379,20 +379,20 @@ docker compose up -d postgres
 ```json
 {
   "scripts": {
-    "dev": "concurrently -n web-console,auth,vault -c auto \"npm --prefix apps/web-console run dev\" \"npm --prefix services/auth-service run dev\" \"cd services/vault-service && air\""
+    "dev": "concurrently -n web-console,auth,vault -c auto \"pnpm --dir apps/web-console run dev\" \"pnpm --dir services/auth-service run dev\" \"cd services/vault-service && air\""
   }
 }
 ```
 
 ```bash
-npm run dev
+pnpm dev
 ```
 
 方案二，Procfile + overmind/foreman：
 
 ```text
-web-console: cd apps/web-console && npm run dev
-auth: cd services/auth-service && npm run dev
+web-console: pnpm --dir apps/web-console run dev
+auth: pnpm --dir services/auth-service run dev
 vault: cd services/vault-service && air
 ```
 
@@ -413,7 +413,7 @@ overmind 支持单服务重启、分别查看日志，适合长期使用；concu
 1. `docker compose up -d postgres` 启动数据库；
 2. 初始化 `auth` schema 迁移并启动 auth-service；
 3. 初始化 `vault` schema 迁移并启动 vault-service；
-4. 启动前端开发服务器，或直接 `npm run dev` / `overmind start` 一次拉起全部应用。
+4. 启动前端开发服务器，或直接 `pnpm dev` / `overmind start` 一次拉起全部应用。
 
 `docker-compose.yml` 首期只需包含 PostgreSQL 服务，本地开发不把三个应用容器化，以免热更新变慢；部署阶段再补完整的 `docker compose up`。
 

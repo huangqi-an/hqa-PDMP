@@ -4,9 +4,11 @@
 
 ## 1. 前置要求
 
-- Node.js 20+ 与 npm（可选 pnpm）；
+- Node.js 20+ 与 pnpm；
 - Go 1.22+；
 - Docker Engine + Docker Compose v2。
+
+pnpm 可通过 `npm i -g pnpm` 安装，或启用 Node 自带的 corepack：`corepack enable && pnpm --version`。
 
 ## 2. 安装 Docker
 

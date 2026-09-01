@@ -13,9 +13,11 @@ export function errorHandler(
 		res
 			.status(400)
 			.json(errorResponse(1002, err.issues[0]?.message ?? "参数错误"));
+		return;
 	}
 	if (err instanceof AppError) {
 		res.status(err.statusCode).json(errorResponse(err.code, err.message));
+		return;
 	}
 	console.error(err);
 	res.status(500).json(errorResponse(9999, "服务器内部错误"));

@@ -2,6 +2,7 @@ import bcrypt from "bcryptjs";
 import prisma from "../config/db";
 import {
 	type LoginInput,
+	type RefreshInput,
 	type RegisterInput,
 } from "../validator/auth.validator";
 import { AppError } from "../utils/error";
@@ -14,6 +15,11 @@ import {
 
 const SALT_ROUNDS = 10;
 
+/**
+ * @description: (service)用户注册
+ * @param {RegisterInput} data
+ * @return {*}
+ */
 export async function registerUser(data: RegisterInput) {
 	const { email, password } = data;
 	//1. 检查是否已注册
@@ -40,6 +46,11 @@ export async function registerUser(data: RegisterInput) {
 	return newUser;
 }
 
+/**
+ * @description: (service)用户登录
+ * @param {LoginInput} data
+ * @return {*}
+ */
 export async function loginUser(data: LoginInput) {
 	const { email, password } = data;
 	const user = await prisma.user.findUnique({
@@ -68,4 +79,35 @@ export async function loginUser(data: LoginInput) {
 		accessToken,
 		refreshToken,
 	};
+}
+
+/**
+ * @description:  (service)刷新accessToken
+ * @param {RefreshInput} data
+ * @return {*}
+ */
+export async function refreshAccessToken(data: RefreshInput) {
+	const payload = verifyRefreshToken(data.refreshToken);
+
+	if (!payload) {
+		throw new AppError(401, 1004, "refreshToken 无效或过期");
+	}
+	const user = await prisma.user.findUnique({
+		where: { id: payload.sub },
+		select: {
+			id: true,
+			email: true,
+		},
+	});
+
+	if (!user) {
+		throw new AppError(401, 1004, "用户不存在");
+	}
+
+	const accessToken = generateAccessToken({
+		sub: user.id,
+		email: user.email,
+	});
+
+	return { accessToken };
 }

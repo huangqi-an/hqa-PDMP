@@ -1,6 +1,8 @@
+
+
 PATCH http://localhost:3001/api/users/me HTTP/1.1
 Content-Type: application/json
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjbXRpdjFzbGUwMDAwZzAwZmY4bjg0NW9xIiwiZW1haWwiOiJ0ZXN0QGV4YW1wbGUuY29tIiwidHlwZSI6ImFjY2VzcyIsImlhdCI6MTc4ODQzOTk0MCwiZXhwIjoxNzg4NDQwODQwfQ.QW4lcd8ANs7hZYSmCZZ-5YwcRbc9zye72s67e0HzcCE
+Authorization: Bearer 
 
 {
   "name": "张三"

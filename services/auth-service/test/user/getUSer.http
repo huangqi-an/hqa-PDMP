@@ -1,0 +1,3 @@
+@accessToken = 
+GET http://localhost:3001/api/users/me
+Authorization:Bearer {{accessToken}}

@@ -9,7 +9,6 @@ import { AppError } from "../utils/error";
 import {
 	generateAccessToken,
 	generateRefreshToken,
-	verifyAccessToken,
 	verifyRefreshToken,
 } from "../utils/jwt";
 

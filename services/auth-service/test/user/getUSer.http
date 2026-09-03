@@ -1,0 +1,3 @@
+@accessToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjbXRpdjFzbGUwMDAwZzAwZmY4bjg0NW9xIiwiZW1haWwiOiJ0ZXN0QGV4YW1wbGUuY29tIiwidHlwZSI6ImFjY2VzcyIsImlhdCI6MTc4ODQ0MDk0NywiZXhwIjoxNzg4NDQxODQ3fQ.qOC9V74fUF0_wSQJiMi6KjG21N8fkZ_wWnvU027JCxI
+GET http://localhost:3001/api/users/me
+Authorization:Bearer {{accessToken}}

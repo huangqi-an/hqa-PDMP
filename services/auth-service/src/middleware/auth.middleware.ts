@@ -16,7 +16,6 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
 	}
 	const token = authHeader.slice("Bearer ".length);
 	const payload = verifyAccessToken(token);
-	console.log("🚀 ~ requireAuth ~ payload:", payload);
 	if (!payload) {
 		return next(new AppError(401, 1005, "未认证或token已过期"));
 	}

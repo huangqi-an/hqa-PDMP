@@ -9,13 +9,14 @@ import { AppError } from "../utils/error";
 import {
 	generateAccessToken,
 	generateRefreshToken,
+	hashToken,
 	verifyRefreshToken,
 } from "../utils/jwt";
 
 const SALT_ROUNDS = 10;
 
 /**
- * @description: (service)用户注册
+ * @description: 用户注册
  * @param {RegisterInput} data
  * @return {*}
  */
@@ -46,7 +47,7 @@ export async function registerUser(data: RegisterInput) {
 }
 
 /**
- * @description: (service)用户登录
+ * @description: 用户登录
  * @param {LoginInput} data
  * @return {*}
  */
@@ -73,6 +74,14 @@ export async function loginUser(data: LoginInput) {
 	const accessToken = generateAccessToken(payload);
 	const refreshToken = generateRefreshToken(payload);
 
+	await prisma.refreshToken.create({
+		data: {
+			tokenHash: hashToken(refreshToken),
+			userId: user.id,
+			expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+		},
+	});
+
 	return {
 		user: { id: user.id, email: user.email },
 		accessToken,
@@ -81,7 +90,7 @@ export async function loginUser(data: LoginInput) {
 }
 
 /**
- * @description:  (service)刷新accessToken
+ * @description: 刷新accessToken
  * @param {RefreshInput} data
  * @return {*}
  */
@@ -91,22 +100,57 @@ export async function refreshAccessToken(data: RefreshInput) {
 	if (!payload) {
 		throw new AppError(401, 1004, "refreshToken 无效或过期");
 	}
-	const user = await prisma.user.findUnique({
-		where: { id: payload.sub },
-		select: {
-			id: true,
-			email: true,
+
+	const tokenHash = hashToken(data.refreshToken);
+	const stored = await prisma.refreshToken.findUnique({
+		where: { tokenHash },
+	});
+
+	if (!stored || stored.revokedAt || stored.expiresAt <= new Date()) {
+		throw new AppError(401, 1004, "refreshToken 已失效");
+	}
+	await prisma.refreshToken.update({
+		where: {
+			id: stored.id,
+		},
+		data: {
+			revokedAt: new Date(),
 		},
 	});
 
-	if (!user) {
-		throw new AppError(401, 1004, "用户不存在");
-	}
-
-	const accessToken = generateAccessToken({
-		sub: user.id,
-		email: user.email,
+	const newRefreshToken = generateRefreshToken({
+		sub: payload.sub,
+		email: payload.email,
 	});
 
-	return { accessToken };
+	await prisma.refreshToken.create({
+		data: {
+			tokenHash: hashToken(newRefreshToken),
+			userId: payload.sub,
+			expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+		},
+	});
+
+	const accessToken = generateAccessToken({
+		sub: payload.sub,
+		email: payload.email,
+	});
+
+	return {
+		accessToken,
+		refreshToken: newRefreshToken,
+	};
+}
+
+export async function logoutUser(data: RefreshInput) {
+	const tokenHash = hashToken(data.refreshToken);
+	await prisma.refreshToken.updateMany({
+		where: {
+			tokenHash,
+			revokedAt: null,
+		},
+		data: {
+			revokedAt: new Date(),
+		},
+	});
 }

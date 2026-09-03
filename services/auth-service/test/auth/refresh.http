@@ -3,5 +3,5 @@ POST http://localhost:3001/api/auth/refresh
 Content-Type: application/json
 
 {
-  "refreshToen": {{refreshToken}}
+  "refreshToken": {{refreshToken}}
 }

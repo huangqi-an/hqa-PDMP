@@ -1,4 +1,5 @@
 import jwt, { type JwtPayload, type SignOptions } from "jsonwebtoken";
+import { createHash } from "node:crypto";
 
 const accessSecret = process.env.JWT_ACCESS_SECRET!;
 const refreshSecret = process.env.JWT_REFRESH_SECRET!;
@@ -77,4 +78,8 @@ export function verifyRefreshToken(token: string): TokenPayload | null {
 	} catch {
 		return null;
 	}
+}
+
+export function hashToken(token: string) {
+	return createHash("sha256").update(token).digest("hex");
 }

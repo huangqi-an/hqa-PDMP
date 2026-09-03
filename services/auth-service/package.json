@@ -23,7 +23,6 @@
 	"packageManager": "pnpm@11.25.0",
 	"type": "module",
 	"devDependencies": {
-		"@types/bcryptjs": "^3.0.0",
 		"@types/cors": "^2.8.19",
 		"@types/express": "^5.0.6",
 		"@types/jsonwebtoken": "^9.0.10",

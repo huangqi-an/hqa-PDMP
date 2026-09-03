@@ -159,7 +159,20 @@ packages:
 | created_at | timestamptz | 默认 now() |
 | updated_at | timestamptz | 默认 now() |
 
-### 5.2 api_keys（vault schema）
+### 5.2 refresh_tokens（auth schema）
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| id | text | 主键，默认 cuid() |
+| token_hash | text | refresh token 的 SHA-256 哈希，唯一 |
+| user_id | text | 所属用户 |
+| expires_at | timestamptz | 过期时间 |
+| revoked_at | timestamptz | 撤销时间，可空 |
+| created_at | timestamptz | 默认 now() |
+
+refresh token 原文只返回给客户端，服务端只保存哈希值。刷新时旧记录标记为撤销，并写入新记录，实现 refresh token 轮换。
+
+### 5.3 api_keys（vault schema）
 
 | 字段 | 类型 | 约束 |
 | --- | --- | --- |
@@ -177,11 +190,11 @@ packages:
 
 索引建议：`(user_id, deleted_at)` 组合索引，便于按用户查询未删除的数据。
 
-### 5.3 跨服务数据一致性
+### 5.4 跨服务数据一致性
 
 `api_keys.user_id` 与 `users.id` 之间存在逻辑外键关系。首期不建跨 schema 的外键约束，以降低服务间耦合；数据一致性由 vault 服务在鉴权后使用 JWT 中的 `sub`（用户 id）保证。
 
-### 5.4 迁移管理
+### 5.5 迁移管理
 
 - `auth` schema 由 Prisma Migrate 管理；
 - `vault` schema 由 golang-migrate 管理。
@@ -208,8 +221,8 @@ packages:
 | --- | --- | --- | --- |
 | POST | /api/auth/register | 否 | 注册，入参 email、password |
 | POST | /api/auth/login | 否 | 登录，入参 email、password |
-| POST | /api/auth/refresh | 否 | 用 refresh token 换新 access token |
-| POST | /api/auth/logout | 是 | 登出 |
+| POST | /api/auth/refresh | 否 | 用 refresh token 换新 access token，并轮换 refresh token |
+| POST | /api/auth/logout | 是 | 撤销当前 refresh token |
 | GET | /api/users/me | 是 | 获取当前用户资料 |
 | PATCH | /api/users/me | 是 | 修改当前用户资料 |
 
@@ -270,12 +283,18 @@ packages:
 ### 7.2 JWT
 
 - 签名算法：HS256；
-- 两个服务共享同一个 `JWT_SECRET`；
+- auth-service 分别使用 `JWT_ACCESS_SECRET` 与 `JWT_REFRESH_SECRET` 签发 access token 和 refresh token；
+- vault-service 使用同一个 `JWT_ACCESS_SECRET` 校验 access token；
 - access token 有效期建议 15 分钟；
 - refresh token 有效期建议 7 天；
 - JWT 的 `sub` 为用户 id，vault 服务校验签名和有效期后信任该 id。
 
-首期 refresh token 由客户端保存，不做服务端状态管理；后续可扩展为 httpOnly cookie 或服务端 denylist。
+access token 为无状态 JWT，不写入数据库。refresh token 原文返回客户端，服务端在 `refresh_tokens` 表中保存其 SHA-256 哈希：
+
+- 登录时写入一条 refresh token 记录；
+- 刷新时校验签名、有效期和 `revoked_at`，然后撤销旧记录并写入新记录；
+- 登出时撤销当前 refresh token；
+- 用户被删除时，通过外键级联删除其 refresh token 记录。
 
 ### 7.3 API Key 加密
 
@@ -312,7 +331,10 @@ packages:
 ```text
 PORT
 DATABASE_URL
-JWT_SECRET
+JWT_ACCESS_SECRET
+JWT_REFRESH_SECRET
+JWT_ACCESS_EXPIRES_IN
+JWT_REFRESH_EXPIRES_IN
 ```
 
 ### 9.2 vault-service
@@ -320,7 +342,7 @@ JWT_SECRET
 ```text
 PORT
 DATABASE_URL
-JWT_SECRET
+JWT_ACCESS_SECRET
 ENCRYPTION_KEY
 ```
 
@@ -364,7 +386,7 @@ server: {
           /            → 前端静态资源
 ```
 
-端口不影响鉴权：两个服务验证同一个 `JWT_SECRET` 签发的 token，因此前端持有一个 token 即可访问任意服务。
+端口不影响鉴权：两个服务验证同一个 `JWT_ACCESS_SECRET` 签发的 access token，因此前端持有一个 token 即可访问任意服务。
 
 ### 10.3 批量启动
 

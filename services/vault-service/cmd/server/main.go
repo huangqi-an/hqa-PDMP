@@ -2,18 +2,24 @@ package main
 
 import (
 	"log"
-	"net/http"
 
-	"github.com/gin-gonic/gin"
+	"github.com/114514-art/hqa-PDMP/services/vault-service/internal/config"
+	"github.com/114514-art/hqa-PDMP/services/vault-service/internal/database"
+	"github.com/114514-art/hqa-PDMP/services/vault-service/internal/router"
 )
 
 func main() {
-	r := gin.Default()
-	r.GET("/health", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{
-			"status": "ok",
-		})
-	})
-
-	log.Fatal(r.Run(":8080"))
+	cfg, err := config.Load()
+	if err != nil {
+		log.Fatal(err)
+	}
+	db, err := database.Connect(cfg.DatabaseURL)
+	if err != nil {
+		log.Fatal(err)
+	}
+	r := router.New(db)
+	log.Printf("vault-service listening on http://localhost:%s", cfg.Port)
+	if err := r.Run(":" + cfg.Port); err != nil {
+		log.Fatal(err)
+	}
 }

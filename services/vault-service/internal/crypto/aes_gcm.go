@@ -62,7 +62,7 @@ func (e *Encryptor) Decrypt(encoded string) (string, error) {
 
 	plaintext, err := e.aead.Open(nil, nonce, ciphertext, nil)
 	if err != nil {
-		return "", fmt.Errorf("decrypt, ciphertext: %w", err)
+		return "", fmt.Errorf("decrypt ciphertext: %w", err)
 	}
 	return string(plaintext), nil
 }

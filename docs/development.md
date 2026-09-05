@@ -144,40 +144,43 @@ packages:
 
 ## 5. 数据库设计
 
-两个服务共用同一个 PostgreSQL 实例，但使用不同的 schema 隔离：
+两个服务共用同一个 PostgreSQL 实例。首期为降低复杂度，暂时都使用 `public` schema：
 
-- `auth`：认证服务管理；
-- `vault`：密钥库服务管理。
+- `auth`：auth-service 通过 Prisma 管理的表；
+- `vault`：vault-service 通过 golang-migrate 管理的表。
 
-### 5.1 users（auth schema）
+后续待服务边界稳定后，再统一拆分到 `auth` / `vault` schema。当前设计文档中的表结构以数据库实际字段为准。
+
+### 5.1 users
 
 | 字段 | 类型 | 约束 |
 | --- | --- | --- |
-| id | UUID | 主键，默认 gen_random_uuid() |
+| id | text | 主键，由 Prisma 生成 CUID |
 | email | text | 唯一，非空 |
-| password_hash | text | 非空 |
-| created_at | timestamptz | 默认 now() |
-| updated_at | timestamptz | 默认 now() |
+| name | text | 可空 |
+| passwordHash | text | 非空 |
+| createdAt | timestamp(3) | 默认 CURRENT_TIMESTAMP |
+| updatedAt | timestamp(3) | 非空，由 Prisma 更新 |
 
-### 5.2 refresh_tokens（auth schema）
+### 5.2 refresh_tokens
 
 | 字段 | 类型 | 说明 |
 | --- | --- | --- |
-| id | text | 主键，默认 cuid() |
-| token_hash | text | refresh token 的 SHA-256 哈希，唯一 |
-| user_id | text | 所属用户 |
-| expires_at | timestamptz | 过期时间 |
-| revoked_at | timestamptz | 撤销时间，可空 |
-| created_at | timestamptz | 默认 now() |
+| id | text | 主键，由 Prisma 生成 CUID |
+| tokenHash | text | refresh token 的 SHA-256 哈希，唯一 |
+| userId | text | 所属用户 |
+| expiresAt | timestamp(3) | 过期时间 |
+| revokedAt | timestamp(3) | 撤销时间，可空 |
+| createdAt | timestamp(3) | 默认 CURRENT_TIMESTAMP |
 
 refresh token 原文只返回给客户端，服务端只保存哈希值。刷新时旧记录标记为撤销，并写入新记录，实现 refresh token 轮换。
 
-### 5.3 api_keys（vault schema）
+### 5.3 api_keys
 
 | 字段 | 类型 | 约束 |
 | --- | --- | --- |
 | id | UUID | 主键，默认 gen_random_uuid() |
-| user_id | UUID | 非空，来源为认证服务的用户 id |
+| user_id | text | 非空，来源为认证服务的 CUID 用户 id |
 | provider | text | 非空 |
 | name | text | 非空 |
 | encrypted_key | text | 非空，base64 编码的密文 |
@@ -196,8 +199,8 @@ refresh token 原文只返回给客户端，服务端只保存哈希值。刷新
 
 ### 5.5 迁移管理
 
-- `auth` schema 由 Prisma Migrate 管理；
-- `vault` schema 由 golang-migrate 管理。
+- auth-service 相关表由 Prisma Migrate 管理；
+- vault-service 相关表由 golang-migrate 管理。
 
 两套迁移文件分开维护，避免互相覆盖。
 
@@ -236,7 +239,7 @@ refresh token 原文只返回给客户端，服务端只保存哈希值。刷新
     "accessToken": "xxx",
     "refreshToken": "yyy",
     "user": {
-      "id": "uuid",
+      "id": "cmxxxxxxxxxxxxxxxxxxxxxxxx",
       "email": "user@example.com"
     }
   }
@@ -260,10 +263,10 @@ refresh token 原文只返回给客户端，服务端只保存哈希值。刷新
 
 ```json
 {
-  "id": "uuid",
+  "id": "06a21299-0f41-4a05-b55e-5f2eecf773ce",
   "provider": "openai",
   "name": "default",
-  "maskedKey": "sk-****abcd",
+  "maskedKey": "****abcd",
   "keyHint": "abcd",
   "notes": "主力 key",
   "tags": ["prod"],
@@ -273,6 +276,18 @@ refresh token 原文只返回给客户端，服务端只保存哈希值。刷新
 ```
 
 明文密钥只通过 `reveal` 接口返回，且只在用户主动查看时返回。
+
+`reveal` 成功返回：
+
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": {
+    "key": "sk-test-1234abcd"
+  }
+}
+```
 
 ## 7. 认证与安全
 
@@ -287,7 +302,7 @@ refresh token 原文只返回给客户端，服务端只保存哈希值。刷新
 - vault-service 使用同一个 `JWT_ACCESS_SECRET` 校验 access token；
 - access token 有效期建议 15 分钟；
 - refresh token 有效期建议 7 天；
-- JWT 的 `sub` 为用户 id，vault 服务校验签名和有效期后信任该 id。
+- JWT 的 `sub` 为 auth-service 的用户 id（当前是 CUID 字符串），vault 服务校验签名和有效期后信任该 id。
 
 access token 为无状态 JWT，不写入数据库。refresh token 原文返回客户端，服务端在 `refresh_tokens` 表中保存其 SHA-256 哈希：
 
@@ -433,8 +448,8 @@ overmind 支持单服务重启、分别查看日志，适合长期使用；concu
 ### 10.5 启动步骤
 
 1. `docker compose up -d postgres` 启动数据库；
-2. 初始化 `auth` schema 迁移并启动 auth-service；
-3. 初始化 `vault` schema 迁移并启动 vault-service；
+2. 执行 auth-service 的 Prisma 迁移并启动 auth-service；
+3. 执行 vault-service 的 golang-migrate 迁移并启动 vault-service；
 4. 启动前端开发服务器，或直接 `pnpm dev` / `overmind start` 一次拉起全部应用。
 
 `docker-compose.yml` 首期只需包含 PostgreSQL 服务，本地开发不把三个应用容器化，以免热更新变慢；部署阶段再补完整的 `docker compose up`。
@@ -445,9 +460,9 @@ overmind 支持单服务重启、分别查看日志，适合长期使用；concu
 | --- | --- | --- |
 | M0 | 初始化 monorepo、docker-compose、基础目录 | 已完成 |
 | M1 | Express 认证服务：注册、登录、刷新、个人资料 | 已完成 |
-| M2 | Gin 密钥库服务：密钥 CRUD、加密、软删除、reveal | 进行中 |
+| M2 | Gin 密钥库服务：密钥 CRUD、加密、软删除、reveal | 已完成 |
 | M3 | Vue 前端：登录、注册、密钥管理、个人资料 | 未开始 |
-| M4 | 双服务 JWT 联调、统一错误处理、Docker 打包 | 未开始 |
+| M4 | 双服务 JWT 联调、统一错误处理、Docker 打包 | 进行中 |
 | M5 | 后续扩展：AI 对话、Agent、个人网盘 | 未开始 |
 
 ## 12. 后续扩展方向

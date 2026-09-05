@@ -4,8 +4,12 @@ import (
 	"log"
 
 	"github.com/114514-art/hqa-PDMP/services/vault-service/internal/config"
+	"github.com/114514-art/hqa-PDMP/services/vault-service/internal/crypto"
 	"github.com/114514-art/hqa-PDMP/services/vault-service/internal/database"
+	"github.com/114514-art/hqa-PDMP/services/vault-service/internal/handler"
+	"github.com/114514-art/hqa-PDMP/services/vault-service/internal/repository"
 	"github.com/114514-art/hqa-PDMP/services/vault-service/internal/router"
+	"github.com/114514-art/hqa-PDMP/services/vault-service/internal/service"
 )
 
 func main() {
@@ -13,11 +17,21 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	db, err := database.Connect(cfg.DatabaseURL)
 	if err != nil {
 		log.Fatal(err)
 	}
-	r := router.New(db)
+
+	encryptor, err := crypto.New(cfg.EncryptionKey)
+	if err != nil {
+		log.Fatal(err)
+	}
+	repo := repository.NewAPIKeyRepository(db)
+	svc := service.NewAPIKeyService(repo, encryptor)
+	keyHandler := handler.NewAPIKeyHandler(svc)
+
+	r := router.New(db, cfg.JWTSecret, keyHandler)
 	log.Printf("vault-service listening on http://localhost:%s", cfg.Port)
 	if err := r.Run(":" + cfg.Port); err != nil {
 		log.Fatal(err)

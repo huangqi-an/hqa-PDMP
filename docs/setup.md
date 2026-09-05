@@ -10,6 +10,19 @@
 
 pnpm 可通过 `npm i -g pnpm` 安装，或启用 Node 自带的 corepack：`corepack enable && pnpm --version`。
 
+如果终端里找不到 `go` 或 `migrate`，把 Go 安装目录和 `$GOPATH/bin` 加入 `PATH`：
+
+```bash
+export PATH="$PATH:/usr/local/go/bin:$(go env GOPATH)/bin"
+```
+
+可将其追加到 `~/.bashrc`，然后重新打开终端。验证：
+
+```bash
+go version
+migrate -version
+```
+
 ## 2. 安装 Docker
 
 Ubuntu 下安装 Docker Engine 与 compose 插件，参考官方步骤，关键命令如下：
@@ -81,12 +94,40 @@ password:  hqa
 database:  hqa_pdmp
 ```
 
-Prisma 使用的 `DATABASE_URL`：
+auth-service 使用的 Prisma `DATABASE_URL`：
 
 ```text
 postgresql://hqa:hqa@localhost:5432/hqa_pdmp?schema=public
 ```
 
+vault-service 使用的 `DATABASE_URL`，本地 PostgreSQL 未启用 SSL，需要显式关闭：
+
+```text
+postgresql://hqa:hqa@localhost:5432/hqa_pdmp?sslmode=disable
+```
+
 ## 6. 各服务启动方式
 
 端口约定、Vite 代理与批量启动方式见 [development.md](./development.md) 第 10 节。
+
+vault-service 启动前，先执行数据库迁移：
+
+```bash
+cd services/vault-service
+
+migrate \
+  -database "postgresql://hqa:hqa@localhost:5432/hqa_pdmp?sslmode=disable" \
+  -path migrations \
+  up
+
+go run ./cmd/server
+```
+
+auth-service 启动前，先执行 Prisma 迁移并启动：
+
+```bash
+cd services/auth-service
+
+pnpm exec prisma migrate dev
+pnpm dev
+```

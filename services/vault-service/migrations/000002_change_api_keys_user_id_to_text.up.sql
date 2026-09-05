@@ -1,0 +1,1 @@
+ALTER TABLE api_keys ALTER COLUMN user_id TYPE TEXT;

@@ -374,6 +374,7 @@ ENCRYPTION_KEY
 | 服务 | 端口 |
 | --- | --- |
 | web（Vite） | 5173 |
+| web-console（Docker/Nginx） | 8081 |
 | auth-service | 3001 |
 | vault-service | 8080 |
 | postgres | 5432 |
@@ -455,6 +456,35 @@ overmind 支持单服务重启、分别查看日志，适合长期使用；concu
 
 `docker-compose.yml` 首期只需包含 PostgreSQL 服务，本地开发不把三个应用容器化，以免热更新变慢；部署阶段再补完整的 `docker compose up`。
 
+### 10.6 Docker Compose 完整部署
+
+当前 `docker-compose.yml` 已支持一键启动完整系统：
+
+```bash
+docker compose up --build -d
+```
+
+部署后访问：
+
+```text
+http://localhost:8081
+```
+
+容器网络：
+
+- 所有服务加入显式 `hqa-network`；
+- 后端通过 `postgres`、`auth-service`、`vault-service` 服务名互相访问；
+- Nginx 将 `/api/auth`、`/api/users` 转发到 auth-service，将 `/api/keys` 转发到 vault-service。
+
+重建时建议先执行：
+
+```bash
+docker compose down
+docker compose up --build -d
+```
+
+`down` 不加 `-v`，会保留 PostgreSQL 数据卷。
+
 ## 11. 里程碑
 
 | 阶段 | 内容 | 状态 |
@@ -463,7 +493,7 @@ overmind 支持单服务重启、分别查看日志，适合长期使用；concu
 | M1 | Express 认证服务：注册、登录、刷新、个人资料 | 已完成 |
 | M2 | Gin 密钥库服务：密钥 CRUD、加密、软删除、reveal | 已完成 |
 | M3 | Vue 前端：登录、注册、密钥管理、个人资料 | 已完成 |
-| M4 | 双服务 JWT 联调、统一错误处理、Docker 打包 | 进行中 |
+| M4 | 双服务 JWT 联调、统一错误处理、Docker 打包、Compose 部署 | 已完成 |
 | M5 | 后续扩展：AI 对话、Agent、个人网盘 | 未开始 |
 
 ## 12. 后续扩展方向

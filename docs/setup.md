@@ -131,3 +131,47 @@ cd services/auth-service
 pnpm exec prisma migrate dev
 pnpm dev
 ```
+
+## 7. 使用 Docker Compose 完整部署
+
+项目根目录的 `docker-compose.yml` 已包含四个服务：
+
+```text
+postgres
+auth-service
+vault-service
+web-console
+```
+
+构建并启动完整系统：
+
+```bash
+docker compose up --build -d
+```
+
+查看状态：
+
+```bash
+docker compose ps
+```
+
+查看日志：
+
+```bash
+docker compose logs -f
+```
+
+前端入口：
+
+```text
+http://localhost:8081
+```
+
+如果修改了 Dockerfile、Nginx 配置或 Compose 后出现网络/服务名解析异常，可重建：
+
+```bash
+docker compose down
+docker compose up --build -d
+```
+
+注意：`docker compose down` 不要加 `-v`，否则会删除 PostgreSQL 数据卷。

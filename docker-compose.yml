@@ -10,6 +10,81 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    networks:
+      - hqa-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hqa -d hqa_pdmp"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  auth-service:
+    build:
+      context: .
+      dockerfile: services/auth-service/Dockerfile
+    image: hqa-auth-service:dev
+    env_file:
+      - services/auth-service/.env
+    environment:
+      PORT: "3001"
+      DATABASE_URL: postgresql://hqa:hqa@postgres:5432/hqa_pdmp?schema=public
+    ports:
+      - "3001:3001"
+    networks:
+      - hqa-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:3001/api/auth/login').then(()=>process.exit(0)).catch(()=>process.exit(1))\""]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
+  vault-service:
+    build:
+      context: services/vault-service
+      dockerfile: Dockerfile
+    image: hqa-vault-service:dev
+    env_file:
+      - services/vault-service/.env
+    environment:
+      PORT: "8080"
+      DATABASE_URL: postgresql://hqa:hqa@postgres:5432/hqa_pdmp?sslmode=disable
+    ports:
+      - "8080:8080"
+    networks:
+      - hqa-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/health || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
+  web-console:
+    build:
+      context: .
+      dockerfile: apps/web-console/Dockerfile
+    image: hqa-web-console:dev
+    ports:
+      - "8081:80"
+    networks:
+      - hqa-network
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      vault-service:
+        condition: service_healthy
+    restart: unless-stopped
+
+networks:
+  hqa-network:
+    driver: bridge
 
 volumes:
   postgres_data:

@@ -335,7 +335,7 @@ access token 为无状态 JWT，不写入数据库。refresh token 原文返回�
 
 - access token 保存在内存或 localStorage，请求拦截器自动注入；
 - access token 过期时自动用 refresh token 刷新后重试原请求；
-- 新建/编辑密钥使用弹窗表单；
+- 新建/编辑密钥当前使用页面内联表单；
 - 删除密钥使用二次确认；
 - 明文密钥只在用户点击“查看”时请求 reveal 接口，不做本地缓存。
 
@@ -387,6 +387,7 @@ ENCRYPTION_KEY
 server: {
   proxy: {
     '/api/auth': 'http://localhost:3001',
+    '/api/users': 'http://localhost:3001',
     '/api/keys': 'http://localhost:8080',
   },
 },
@@ -461,7 +462,7 @@ overmind 支持单服务重启、分别查看日志，适合长期使用；concu
 | M0 | 初始化 monorepo、docker-compose、基础目录 | 已完成 |
 | M1 | Express 认证服务：注册、登录、刷新、个人资料 | 已完成 |
 | M2 | Gin 密钥库服务：密钥 CRUD、加密、软删除、reveal | 已完成 |
-| M3 | Vue 前端：登录、注册、密钥管理、个人资料 | 未开始 |
+| M3 | Vue 前端：登录、注册、密钥管理、个人资料 | 已完成 |
 | M4 | 双服务 JWT 联调、统一错误处理、Docker 打包 | 进行中 |
 | M5 | 后续扩展：AI 对话、Agent、个人网盘 | 未开始 |
 

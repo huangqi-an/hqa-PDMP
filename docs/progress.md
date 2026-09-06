@@ -2,7 +2,7 @@
 
 > 本文用于记录项目从环境搭建到各服务开发过程中的关键决策、已完成内容和遇到的问题。架构设计见 [development.md](./development.md)，环境安装见 [setup.md](./setup.md)。
 
-最后更新：2026-09-06
+最后更新：2026-09-07
 
 ## 1. 当前进度
 
@@ -12,9 +12,9 @@
 | M1 | auth-service：注册、登录、刷新、资料管理 | 已完成 |
 | M2 | vault-service：API Key CRUD、加密、软删除、reveal | 已完成 |
 | M3 | web-console 前端 | 已完成 |
-| M4 | 双服务 JWT 联调、Docker 打包 | 进行中 |
+| M4 | 双服务 JWT 联调、Docker 打包、Compose 部署 | 已完成 |
 
-当前 M0-M3 的本地 MVP 已经打通：auth-service、vault-service、web-console 可以通过本地端口和 Vite 代理协作。M4 中剩余工作主要是生产部署、Dockerfile 与完整 `docker compose up`。
+当前 M0-M4 已完成：auth-service、vault-service、web-console 均已容器化，并可通过 `docker compose up --build -d` 一键启动完整系统。
 
 ## 2. 已完成内容
 
@@ -103,6 +103,20 @@
 - `DefaultLayout` 提供控制台侧边栏和退出登录；
 - API Key 明文只在用户点击“查看明文”后加载到页面内存，不做持久化。
 
+### 2.5 Docker 与 Compose 部署
+
+已完成的容器化内容：
+
+- `services/auth-service/Dockerfile`：Node 24 + pnpm + Prisma migrate deploy + tsx 启动；
+- `services/vault-service/Dockerfile`：Go 多阶段构建，包含 `vault-service` 二进制和 `migrate` CLI；
+- `apps/web-console/Dockerfile`：Vite 构建 + Nginx 静态服务和反向代理；
+- 根目录 `.dockerignore`；
+- `services/vault-service/.dockerignore`；
+- `docker-compose.yml`：编排 postgres、auth-service、vault-service、web-console；
+- Compose 显式网络 `hqa-network`；
+- PostgreSQL、auth-service、vault-service 健康检查；
+- web-console 等待后端健康后再启动。
+
 ## 3. 关键决策
 
 | 主题 | 决策 | 原因 |
@@ -125,6 +139,11 @@
 | 前端请求封装 | Axios + 拦截器 | 自动注入 token，401 时自动刷新并重试 |
 | token 前端存储 | localStorage | 当前本地 MVP 简单可靠，后续可评估更安全的存储方案 |
 | 前端页面结构 | 登录/注册独立页面 + 控制台布局 | 符合个人数据控制台定位 |
+| auth-service 容器启动 | 容器内执行 Prisma migrate deploy | 生产环境只应用已有迁移，不交互式创建迁移 |
+| vault-service 容器启动 | 容器内执行 golang-migrate up | 启动服务前先保证数据库结构一致 |
+| 前端生产部署 | Vite build + Nginx | 前端静态化，并由 Nginx 统一代理 API |
+| Compose 网络 | 显式 bridge 网络 | 避免旧 Compose 网络导致服务名 DNS 解析失败 |
+| 健康检查 | postgres/auth/vault 分别配置 healthcheck | web-console 等后端可用后再启动，避免 Nginx 上游解析失败 |
 
 ## 4. 已遇到的问题与解决办法
 
@@ -356,6 +375,85 @@ import { useAuthStore } from "../stores/auth";
 
 解决：在项目根目录建立统一的 `pnpm-workspace.yaml`，包含 `apps/*`、`services/*`、`packages/*`，并移除 auth-service 内部的独立 workspace 文件。
 
+### 4.7 Docker 镜像与 Compose 部署
+
+**问题：构建 auth-service 镜像时，pnpm 从 `registry.npmjs.org` 下载依赖超时**
+
+原因：容器内没有宿主机 pnpm 配置，默认访问官方 npm registry，网络不稳定。
+
+解决：在 Dockerfile 中执行：
+
+```dockerfile
+RUN pnpm config set registry https://registry.npmmirror.com
+```
+
+**问题：构建 web-console 镜像时提示 `"/nginx.conf": not found`**
+
+原因：Docker 构建上下文是项目根目录，而 `nginx.conf` 实际位于 `apps/web-console/nginx.conf`。
+
+解决：改为：
+
+```dockerfile
+COPY apps/web-console/nginx.conf /etc/nginx/conf.d/default.conf
+```
+
+**问题：Compose 启动后 auth-service 和 vault-service 无法解析 `postgres`**
+
+现象：
+
+```text
+lookup postgres on 127.0.0.53:53
+```
+
+原因：将 `docker-compose.yml` 从单 PostgreSQL 扩展为多服务后，旧网络和旧容器未完全重建，服务没有正确接入 Compose 网络。
+
+解决：
+
+- 在 Compose 中为所有服务显式指定同一个 `hqa-network`；
+- 执行 `docker compose down` 后再 `docker compose up --build -d`；
+- 保留 `postgres_data` 卷，不加 `-v`。
+
+**问题：Nginx 启动时报 `host not found in upstream "auth-service"`**
+
+原因：web-console 原先只依赖 `service_started`，但后端可能仍在重启，Nginx 启动时无法解析上游服务名。
+
+解决：
+
+- 给 auth-service 和 vault-service 增加 healthcheck；
+- web-console 改为：
+
+```yaml
+depends_on:
+  auth-service:
+    condition: service_healthy
+  vault-service:
+    condition: service_healthy
+```
+
+**问题：`GET /api/keys` 被 Nginx 返回 301 并跳转到不带端口的 `localhost`**
+
+原因：Nginx 配置使用 `location /api/keys/`，只匹配带结尾斜杠的路径，`/api/keys` 未命中代理规则。
+
+解决：改为不带结尾斜杠的前缀匹配：
+
+```nginx
+location /api/keys {
+    proxy_pass http://vault-service:8080;
+}
+```
+
+同时将 `/api/auth`、`/api/users` 也改为不带结尾斜杠。
+
+**问题：修复 Nginx 后，浏览器仍请求旧的 301 响应**
+
+原因：浏览器缓存了修复前的 301 重定向。
+
+解决：
+
+- 强制刷新：`Ctrl + Shift + R`；
+- 或在 DevTools Network 中勾选 `Disable cache`；
+- 或清除 `localhost:8081` 的站点缓存后重新登录。
+
 ## 5. 当前环境变量约定
 
 ### auth-service
@@ -381,7 +479,7 @@ ENCRYPTION_KEY
 ## 6. 下一步计划
 
 1. 完善前端体验：创建/编辑表单互斥、删除后页码回退、展示后端业务错误、接入 UI 组件库；
-2. 完善 M4：为 auth-service、vault-service 和 web-console 编写 Dockerfile；
-3. 扩展 `docker-compose.yml`，支持完整的一键部署；
-4. 部署阶段由 Nginx 或 Caddy 统一代理 `/api/auth`、`/api/users`、`/api/keys` 和前端静态资源；
-5. 根据联调结果继续统一错误码、日志和 API 契约。
+2. 补充 CI 或基础测试，减少手工回归成本；
+3. 完善生产环境 secret 管理，避免依赖本地 `.env` 文件；
+4. 根据实际部署需求优化镜像体积、非 root 用户和健康检查；
+5. 继续规划 M5：AI 对话、Agent、个人网盘。

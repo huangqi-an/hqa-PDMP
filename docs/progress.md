@@ -11,10 +11,10 @@
 | M0 | monorepo、docker-compose、基础目录 | 已完成 |
 | M1 | auth-service：注册、登录、刷新、资料管理 | 已完成 |
 | M2 | vault-service：API Key CRUD、加密、软删除、reveal | 已完成 |
-| M3 | web-console 前端 | 未开始 |
+| M3 | web-console 前端 | 已完成 |
 | M4 | 双服务 JWT 联调、Docker 打包 | 进行中 |
 
-当前 `vault-service` 已实现 API Key 完整 CRUD、AES-256-GCM 加密、软删除与 reveal，并已通过本地双服务 JWT 联调。M4 中剩余工作主要是生产部署与 Docker 打包。
+当前 M0-M3 的本地 MVP 已经打通：auth-service、vault-service、web-console 可以通过本地端口和 Vite 代理协作。M4 中剩余工作主要是生产部署、Dockerfile 与完整 `docker compose up`。
 
 ## 2. 已完成内容
 
@@ -79,6 +79,30 @@
 - 所有查询都同时限制 `id` 与 `user_id`，防止越权访问；
 - GORM 软删除通过 `gorm.DeletedAt` 实现。
 
+### 2.4 web-console
+
+技术栈：Vue 3 + Vite + TypeScript + Vue Router + Pinia + Axios。
+
+已实现页面：
+
+| 路由 | 页面 | 说明 |
+| --- | --- | --- |
+| `/login` | 登录页 | 邮箱、密码登录 |
+| `/register` | 注册页 | 邮箱、密码注册 |
+| `/keys` | API Key 列表 | 列表、搜索、筛选、创建、编辑、删除、查看明文、分页 |
+| `/profile` | 个人资料 | 查看当前用户、修改昵称 |
+
+已实现能力：
+
+- 根目录 `pnpm-workspace.yaml` 管理 `apps/*`、`services/*`、`packages/*`；
+- Vite 代理将 `/api/auth`、`/api/users` 转发到 auth-service，将 `/api/keys` 转发到 vault-service；
+- Axios 请求拦截器自动注入 access token；
+- Axios 响应拦截器在 401 时使用 refresh token 刷新并重试原请求；
+- Pinia 管理当前用户、access token 和 refresh token；
+- Vue Router 守卫保护 `/keys`、`/profile`，未登录跳转 `/login`；
+- `DefaultLayout` 提供控制台侧边栏和退出登录；
+- API Key 明文只在用户点击“查看明文”后加载到页面内存，不做持久化。
+
 ## 3. 关键决策
 
 | 主题 | 决策 | 原因 |
@@ -97,6 +121,10 @@
 | vault-service 数据库迁移 | golang-migrate | 与 Prisma Migrate 分离，避免互相覆盖 |
 | vault-service 密钥存储 | 只存 AES-256-GCM 密文 | 保护模型 API Key 明文 |
 | vault-service JWT 算法 | HS256 | auth-service 使用共享密钥签发 HS256 JWT |
+| 前端 workspace | 根目录统一 pnpm workspace | 统一管理前端、服务和后续共享包 |
+| 前端请求封装 | Axios + 拦截器 | 自动注入 token，401 时自动刷新并重试 |
+| token 前端存储 | localStorage | 当前本地 MVP 简单可靠，后续可评估更安全的存储方案 |
+| 前端页面结构 | 登录/注册独立页面 + 控制台布局 | 符合个人数据控制台定位 |
 
 ## 4. 已遇到的问题与解决办法
 
@@ -294,6 +322,40 @@ postgresql://hqa:hqa@localhost:5432/hqa_pdmp?sslmode=disable
 GOCACHE=/tmp/hqa-gocache go test ./...
 ```
 
+### 4.6 Vue 与 web-console
+
+**问题：前端请求 `/api/users` 时 Vite 没有转发到 auth-service**
+
+原因：最初的代理只配置了 `/api/auth` 和 `/api/keys`，遗漏了个人资料接口。
+
+解决：在 `vite.config.ts` 中补充：
+
+```ts
+"/api/users": "http://localhost:3001",
+```
+
+**问题：`http.ts` 中刷新 token 结果被推断为 `string`**
+
+现象：TypeScript 报 `Property 'accessToken' does not exist on type 'string'`。
+
+原因：`refreshPromise` 被错误地声明为 `Promise<string | null>`，而实际刷新接口返回 `{ accessToken, refreshToken }`。
+
+解决：定义 `RefreshSession` 类型，并为刷新请求补充 Axios 泛型。
+
+**问题：`router/index.ts` 中 store import 带了 `.ts` 后缀**
+
+解决：统一改为：
+
+```ts
+import { useAuthStore } from "../stores/auth";
+```
+
+**问题：根级 workspace 未建立，`services/auth-service` 内部存在独立 workspace 文件**
+
+原因：auth-service 初始化时把 `pnpm-workspace.yaml` 放在了服务目录内。
+
+解决：在项目根目录建立统一的 `pnpm-workspace.yaml`，包含 `apps/*`、`services/*`、`packages/*`，并移除 auth-service 内部的独立 workspace 文件。
+
 ## 5. 当前环境变量约定
 
 ### auth-service
@@ -318,8 +380,8 @@ ENCRYPTION_KEY
 
 ## 6. 下一步计划
 
-1. 开始 M3：创建 `apps/web-console`，搭建 Vue 3 + Vite + TypeScript；
-2. 实现登录、注册、API Key 列表与密钥管理页面；
-3. 前端接入 auth-service 与 vault-service，完成 access token 注入与过期刷新；
-4. 完善 M4：补充双服务 Dockerfile 和完整的 `docker compose up`；
-5. 根据联调结果统一错误码与 API 契约。
+1. 完善前端体验：创建/编辑表单互斥、删除后页码回退、展示后端业务错误、接入 UI 组件库；
+2. 完善 M4：为 auth-service、vault-service 和 web-console 编写 Dockerfile；
+3. 扩展 `docker-compose.yml`，支持完整的一键部署；
+4. 部署阶段由 Nginx 或 Caddy 统一代理 `/api/auth`、`/api/users`、`/api/keys` 和前端静态资源；
+5. 根据联调结果继续统一错误码、日志和 API 契约。

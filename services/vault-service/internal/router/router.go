@@ -3,9 +3,9 @@ package router
 import (
 	"net/http"
 
-	"github.com/114514-art/hqa-PDMP/services/vault-service/internal/handler"
-	"github.com/114514-art/hqa-PDMP/services/vault-service/internal/middleware"
 	"github.com/gin-gonic/gin"
+	"github.com/huangqi-an/hqa-PDMP/services/vault-service/internal/handler"
+	"github.com/huangqi-an/hqa-PDMP/services/vault-service/internal/middleware"
 	"gorm.io/gorm"
 )
 

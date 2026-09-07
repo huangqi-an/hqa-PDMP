@@ -82,9 +82,26 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  redis:
+    image: redis:7-alpine
+    container_name: hqa-redis
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - hqa-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
 networks:
   hqa-network:
     driver: bridge
 
 volumes:
   postgres_data:
+  redis_data:

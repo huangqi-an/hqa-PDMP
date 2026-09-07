@@ -90,3 +90,6 @@ jobs:
 
       - name: Build
         run: pnpm --filter web-console build
+
+      - name: Test
+        run: pnpm --filter web-console test

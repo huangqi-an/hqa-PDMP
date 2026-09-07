@@ -98,6 +98,30 @@ services:
       timeout: 5s
       retries: 10
 
+  worker-service:
+    build:
+      context: services/worker-service
+      dockerfile: Dockerfile
+    image: hqa-worker-service:dev
+    env_file:
+      - services/worker-service/.env
+    environment:
+      PORT: "8082"
+      REDIS_ADDR: redis:6379
+    ports:
+      - "8082:8082"
+    networks:
+      - hqa-network
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8082/health || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
 networks:
   hqa-network:
     driver: bridge

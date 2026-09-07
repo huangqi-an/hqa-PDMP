@@ -93,3 +93,29 @@ jobs:
 
       - name: Test
         run: pnpm --filter web-console test
+
+  worker-service:
+    name: worker-service check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: services/worker-service/go.mod
+          cache-dependency-path: services/worker-service/go.sum
+
+      - name: Test
+        working-directory: services/worker-service
+        run: go test ./...
+
+      - name: Vet
+        working-directory: services/worker-service
+        run: go vet ./...
+
+      - name: Gofmt
+        working-directory: services/worker-service
+        run: test -z "$(gofmt -l cmd internal)"

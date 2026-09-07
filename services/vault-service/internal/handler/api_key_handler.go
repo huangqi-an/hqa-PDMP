@@ -7,7 +7,7 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"github.com/haungqi-an/hqa-PDMP/services/vault-service/internal/service"
+	"github.com/huangqi-an/hqa-PDMP/services/vault-service/internal/service"
 )
 
 type APIKeyHandler struct {

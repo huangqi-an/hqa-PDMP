@@ -5,9 +5,9 @@ import (
 	"errors"
 	"time"
 
-	"github.com/haungqi-an/hqa-PDMP/services/vault-service/internal/crypto"
-	"github.com/haungqi-an/hqa-PDMP/services/vault-service/internal/model"
-	"github.com/haungqi-an/hqa-PDMP/services/vault-service/internal/repository"
+	"github.com/huangqi-an/hqa-PDMP/services/vault-service/internal/crypto"
+	"github.com/huangqi-an/hqa-PDMP/services/vault-service/internal/model"
+	"github.com/huangqi-an/hqa-PDMP/services/vault-service/internal/repository"
 	"github.com/lib/pq"
 	"gorm.io/gorm"
 )

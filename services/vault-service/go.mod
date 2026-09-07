@@ -1,4 +1,4 @@
-module github.com/haungqi-an/hqa-PDMP/services/vault-service
+module github.com/huangqi-an/hqa-PDMP/services/vault-service
 
 go 1.27.0
 

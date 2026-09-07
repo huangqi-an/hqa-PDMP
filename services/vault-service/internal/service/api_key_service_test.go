@@ -7,8 +7,8 @@ import (
 
 	"gorm.io/gorm"
 
-	"github.com/haungqi-an/hqa-PDMP/services/vault-service/internal/crypto"
-	"github.com/haungqi-an/hqa-PDMP/services/vault-service/internal/model"
+	"github.com/huangqi-an/hqa-PDMP/services/vault-service/internal/crypto"
+	"github.com/huangqi-an/hqa-PDMP/services/vault-service/internal/model"
 )
 
 type fakeRepo struct {

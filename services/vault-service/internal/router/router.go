@@ -4,8 +4,8 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/haungqi-an/hqa-PDMP/services/vault-service/internal/handler"
-	"github.com/haungqi-an/hqa-PDMP/services/vault-service/internal/middleware"
+	"github.com/huangqi-an/hqa-PDMP/services/vault-service/internal/handler"
+	"github.com/huangqi-an/hqa-PDMP/services/vault-service/internal/middleware"
 	"gorm.io/gorm"
 )
 

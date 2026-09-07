@@ -3,13 +3,13 @@ package main
 import (
 	"log"
 
-	"github.com/haungqi-an/hqa-PDMP/services/vault-service/internal/config"
-	"github.com/haungqi-an/hqa-PDMP/services/vault-service/internal/crypto"
-	"github.com/haungqi-an/hqa-PDMP/services/vault-service/internal/database"
-	"github.com/haungqi-an/hqa-PDMP/services/vault-service/internal/handler"
-	"github.com/haungqi-an/hqa-PDMP/services/vault-service/internal/repository"
-	"github.com/haungqi-an/hqa-PDMP/services/vault-service/internal/router"
-	"github.com/haungqi-an/hqa-PDMP/services/vault-service/internal/service"
+	"github.com/huangqi-an/hqa-PDMP/services/vault-service/internal/config"
+	"github.com/huangqi-an/hqa-PDMP/services/vault-service/internal/crypto"
+	"github.com/huangqi-an/hqa-PDMP/services/vault-service/internal/database"
+	"github.com/huangqi-an/hqa-PDMP/services/vault-service/internal/handler"
+	"github.com/huangqi-an/hqa-PDMP/services/vault-service/internal/repository"
+	"github.com/huangqi-an/hqa-PDMP/services/vault-service/internal/router"
+	"github.com/huangqi-an/hqa-PDMP/services/vault-service/internal/service"
 )
 
 func main() {

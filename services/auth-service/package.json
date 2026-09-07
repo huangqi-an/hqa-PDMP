@@ -4,7 +4,7 @@
 	"description": "",
 	"main": "index.js",
 	"scripts": {
-		"test": "echo \"Error: no test specified\" && exit 1",
+		"test": "node --import tsx --test src/validator/auth.validator.test.ts src/validator/user.validator.test.ts",
 		"typecheck": "tsc --noEmit",
 		"prisma:generate": "prisma generate",
 		"prisma:migrate": "prisma migrate dev",

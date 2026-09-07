@@ -37,6 +37,9 @@ jobs:
       - name: Typecheck
         run: pnpm --filter auth-service typecheck
 
+      - name: Test
+        run: pnpm --filter auth-service test
+
   vault-service:
     name: vault-service check
     runs-on: ubuntu-latest

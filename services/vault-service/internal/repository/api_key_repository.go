@@ -9,6 +9,14 @@ import (
 	"gorm.io/gorm"
 )
 
+type Repository interface {
+	Create(ctx context.Context, key *model.APIKey) error
+	FindByID(ctx context.Context, userID string, id string) (*model.APIKey, error)
+	List(ctx context.Context, userID string, provider string, query string, limit int, offset int) ([]model.APIKey, int64, error)
+	Update(ctx context.Context, key *model.APIKey) error
+	SoftDelete(ctx context.Context, userID string, id string) error
+}
+
 type APIKeyRepository struct {
 	db *gorm.DB
 }

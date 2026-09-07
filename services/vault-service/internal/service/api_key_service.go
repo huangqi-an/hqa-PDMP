@@ -15,11 +15,14 @@ import (
 var ErrAPIKeyNotFound = errors.New("api key not found")
 
 type APIKeyService struct {
-	repo      *repository.APIKeyRepository
+	repo      repository.Repository
 	encryptor *crypto.Encryptor
 }
 
-func NewAPIKeyService(repo *repository.APIKeyRepository, encryptor *crypto.Encryptor) *APIKeyService {
+func NewAPIKeyService(
+	repo repository.Repository,
+	encryptor *crypto.Encryptor,
+) *APIKeyService {
 	return &APIKeyService{
 		repo:      repo,
 		encryptor: encryptor,

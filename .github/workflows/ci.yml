@@ -1,0 +1,89 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  auth-service:
+    name: auth-service check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.25.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --filter auth-service
+
+      - name: Generate Prisma Client
+        env:
+          DATABASE_URL: postgresql://hqa:hqa@localhost:5432/hqa_pdmp?schema=public
+        run: pnpm --filter auth-service exec prisma generate
+
+      - name: Typecheck
+        run: pnpm --filter auth-service typecheck
+
+  vault-service:
+    name: vault-service check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: services/vault-service/go.mod
+          cache-dependency-path: services/vault-service/go.sum
+
+      - name: Test
+        working-directory: services/vault-service
+        run: go test ./...
+
+      - name: Vet
+        working-directory: services/vault-service
+        run: go vet ./...
+
+      - name: Gofmt
+        working-directory: services/vault-service
+        run: test -z "$(gofmt -l cmd internal)"
+
+  web-console:
+    name: web-console check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.25.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --filter web-console
+
+      - name: Build
+        run: pnpm --filter web-console build

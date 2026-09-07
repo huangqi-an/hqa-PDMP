@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/114514-art/hqa-PDMP/services/vault-service/internal/service"
 	"github.com/gin-gonic/gin"
+	"github.com/haungqi-an/hqa-PDMP/services/vault-service/internal/service"
 )
 
 type APIKeyHandler struct {

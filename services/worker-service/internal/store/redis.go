@@ -96,10 +96,16 @@ func (s *TaskStore) BlockingPop(ctx context.Context, timeout time.Duration) (*Ta
 }
 
 func (s *TaskStore) SetStatus(ctx context.Context, id string, status string, result string) error {
-	return s.client.HSet(ctx, taskKey(id), map[string]any{
+	pipe := s.client.TxPipeline()
+
+	pipe.HSet(ctx, taskKey(id), map[string]any{
 		"status": status,
 		"result": result,
-	}).Err()
+	})
+	pipe.Expire(ctx, taskKey(id), taskTTL)
+
+	_, err := pipe.Exec(ctx)
+	return err
 }
 
 func (s *TaskStore) Get(ctx context.Context, id string) (map[string]string, error) {

@@ -509,3 +509,7 @@ docker compose up --build -d
 - 所有接口使用统一响应格式和错误码；
 - 日志使用结构化日志，禁止记录密码、明文密钥、JWT；
 - 提交信息保持清晰，按模块描述变更。
+
+## 14. worker-service 任务队列设计
+
+worker-service 已使用 Redis Streams 实现任务队列，并通过消费组、`XACK` 和 pending 支持消息确认。设计背景、List 到 Streams 的对比与学习路径见 [worker-queue-design.md](./worker-queue-design.md)。

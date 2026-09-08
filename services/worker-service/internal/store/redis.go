@@ -5,15 +5,17 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/redis/go-redis/v9"
 )
 
 const (
-	taskQueueKey  = "worker:tasks"
 	taskKeyPrefix = "task:"
 	taskTTL       = time.Hour
+	taskStreamKey = "worker:task-stream"
+	taskGroupName = "worker-group"
 )
 
 type Task struct {
@@ -22,6 +24,11 @@ type Task struct {
 	Payload string `json:"payload"`
 	Status  string `json:"status"`
 	Result  string `json:"result"`
+}
+
+type StreamTask struct {
+	Task     Task
+	StreamID string
 }
 
 type TaskStore struct {
@@ -60,7 +67,12 @@ func (s *TaskStore) Enqueue(ctx context.Context, task Task) error {
 
 	pipe := s.client.TxPipeline()
 
-	pipe.LPush(ctx, taskQueueKey, payload)
+	pipe.XAdd(ctx, &redis.XAddArgs{
+		Stream: taskStreamKey,
+		Values: map[string]any{
+			"task": payload,
+		},
+	})
 	pipe.HSet(ctx, taskKey(task.ID), map[string]any{
 		"id":      task.ID,
 		"type":    task.Type,
@@ -72,27 +84,6 @@ func (s *TaskStore) Enqueue(ctx context.Context, task Task) error {
 
 	_, err = pipe.Exec(ctx)
 	return err
-}
-
-func (s *TaskStore) BlockingPop(ctx context.Context, timeout time.Duration) (*Task, error) {
-	result, err := s.client.BRPop(ctx, timeout, taskQueueKey).Result()
-	if errors.Is(err, redis.Nil) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	if len(result) < 2 {
-		return nil, nil
-	}
-
-	var task Task
-	if err := json.Unmarshal([]byte(result[1]), &task); err != nil {
-		return nil, fmt.Errorf("unmarshal task: %w", err)
-	}
-
-	return &task, nil
 }
 
 func (s *TaskStore) SetStatus(ctx context.Context, id string, status string, result string) error {
@@ -110,4 +101,70 @@ func (s *TaskStore) SetStatus(ctx context.Context, id string, status string, res
 
 func (s *TaskStore) Get(ctx context.Context, id string) (map[string]string, error) {
 	return s.client.HGetAll(ctx, taskKey(id)).Result()
+}
+
+func (s *TaskStore) EnsureGroup(ctx context.Context) error {
+	err := s.client.XGroupCreateMkStream(
+		ctx,
+		taskStreamKey,
+		taskGroupName,
+		"$",
+	).Err()
+
+	if err != nil && !strings.Contains(err.Error(), "BUSYGROUP") {
+		return err
+	}
+
+	return nil
+}
+
+func (s *TaskStore) ReadGroup(
+	ctx context.Context,
+	consumer string,
+	timeout time.Duration,
+) (*StreamTask, error) {
+	streams, err := s.client.XReadGroup(ctx, &redis.XReadGroupArgs{
+		Group:    taskGroupName,
+		Consumer: consumer,
+		Streams:  []string{taskStreamKey, ">"},
+		Count:    1,
+		Block:    timeout,
+	}).Result()
+
+	if errors.Is(err, redis.Nil) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	if len(streams) == 0 || len(streams[0].Messages) == 0 {
+		return nil, nil
+	}
+
+	msg := streams[0].Messages[0]
+
+	payload, ok := msg.Values["task"].(string)
+	if !ok {
+		return nil, fmt.Errorf("stream task payload is not string")
+	}
+
+	var task Task
+	if err := json.Unmarshal([]byte(payload), &task); err != nil {
+		return nil, fmt.Errorf("unmarshal stream task: %w", err)
+	}
+
+	return &StreamTask{
+		Task:     task,
+		StreamID: msg.ID,
+	}, nil
+}
+
+func (s *TaskStore) Ack(ctx context.Context, streamID string) error {
+	return s.client.XAck(
+		ctx,
+		taskStreamKey,
+		taskGroupName,
+		streamID,
+	).Err()
 }
